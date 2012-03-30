@@ -5,6 +5,8 @@
 #include <sys/types.h>
 #include <pwd.h>
 
+#include "../config.h"
+
 /*
  * Target user information
  */

@@ -20,8 +20,6 @@
 
 #include "user-session.h"
 
-#define DEFAULT_USERNAME "app"
-
 int tty = 1;
 char username[256] = DEFAULT_USERNAME;
 char dpinum[256] = "auto";
