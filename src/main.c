@@ -108,8 +108,6 @@ int main(int argc, char **argv)
 	
 	set_tty();
 
-	setup_xauth();
-
 	setup_pam_session();
 
 	switch_to_user();

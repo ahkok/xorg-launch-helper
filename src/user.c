@@ -143,23 +143,13 @@ void switch_to_user(void)
 
 	ret = chdir(pass->pw_dir);
 
+	setup_xauth();
+
 	fp = fopen(user_xauth_path, "w");
 	if (fp) {
 		if (XauWriteAuth(fp, &x_auth) != 1)
 			lprintf("Unable to write .Xauthority");
 		fclose(fp);
-	}
-
-	/* redirect further IO to .xsession-errors */
-	snprintf(fn, PATH_MAX, "%s/.xsession-errors", pass->pw_dir);
-	fp = fopen(fn, "w");
-	if (fp) {
-		fclose(fp);
-		/* xserver.c already truncates this file, so append */
-		fp = freopen(fn, "a", stdout);
-		fp = freopen(fn, "a", stderr);
-	} else {
-		lprintf("Unable to open \"%s\n\" for writing", fn);
 	}
 
 	d_out();

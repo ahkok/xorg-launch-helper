@@ -304,17 +304,6 @@ void start_X_server(void)
 	}
 	lprintf("starting X server with: \"%s\"", all);
 
-	/* redirect further IO to .xsession-errors */
-	snprintf(fn, PATH_MAX, "%s/.xsession-errors", pass->pw_dir);
-	fp = fopen(fn, "w");
-	if (fp) {
-		fclose(fp);
-		fp = freopen(fn, "w", stdout);
-		fp = freopen(fn, "w", stderr);
-	} else {
-		lprintf("Unable to open \"%s\n\" for writing", fn);
-	}
-
 	execv(ptrs[0], ptrs);
 
 	d_out();
