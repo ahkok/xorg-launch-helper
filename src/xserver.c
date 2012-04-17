@@ -34,12 +34,8 @@
 
 #include "user-session.h"
 
-#include <X11/Xauth.h>
-
 char displaydev[PATH_MAX];	/* "/dev/tty1" */
 char displayname[256] = ":0";	/* ":0" */
-char xauth_cookie_file[PATH_MAX];
-Xauth x_auth;
 
 static pthread_mutex_t notify_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t notify_condition = PTHREAD_COND_INITIALIZER;
@@ -83,72 +79,6 @@ void set_tty(void)
 	snprintf(displaydev, PATH_MAX, "/dev/tty%d", tty);
 
 	lprintf("Using %s as display device", displaydev);
-
-	d_out();
-}
-
-void setup_xauth(void)
-{
-	FILE *fp;
-	int fd;
-	static char cookie[16];
-	struct utsname uts;
-
-	static char xau_address[80];
-	static char xau_number[] = "0"; // FIXME, detect correct displaynum
-	static char xau_name[] = "MIT-MAGIC-COOKIE-1";
-
-	d_in();
-
-	fp = fopen("/dev/urandom", "r");
-	if (!fp)
-		return;
-	if (fgets(cookie, sizeof(cookie), fp) == NULL) {
-		fclose(fp);
-		return;
-	}
-	fclose(fp);
-
-	/* construct xauth data */
-	if (uname(&uts) < 0) {
-		lprintf("uname failed");
-		return;
-	}
-
-	sprintf(xau_address, "%s", uts.nodename);
-	x_auth.family = FamilyLocal;
-	x_auth.address = xau_address;
-	x_auth.number = xau_number;
-	x_auth.name = xau_name;
-	x_auth.address_length = strlen(xau_address);
-	x_auth.number_length = strlen(xau_number);
-	x_auth.name_length = strlen(xau_name);
-	x_auth.data = (char *) cookie;
-	x_auth.data_length = sizeof(cookie);
-
-	snprintf(xauth_cookie_file, PATH_MAX, "/run/user/%s/Xauth-XXXXXX",
-		 pass->pw_name);
-
-	fd = mkstemp(xauth_cookie_file);
-	if (fd < 0) {
-		lprintf("unable to make tmp file for xauth");
-		return;
-	}
-
-	lprintf("Xauth cookie file: %s", xauth_cookie_file);
-
-	fp = fdopen(fd, "a");
-	if (!fp) {
-		lprintf("unable to open xauth fp");
-		close(fd);
-		return;
-	}
-
-	/* write it out to disk */
-	if (XauWriteAuth(fp, &x_auth) != 1)
-		lprintf("unable to write xauth data to disk");
-
-	fclose(fp);
 
 	d_out();
 }
@@ -285,9 +215,6 @@ void start_X_server(void)
 	ptrs[++count] = strdup("tcp");
 
 	ptrs[++count] = strdup("-noreset");
-
-	ptrs[++count] = strdup("-auth");
-	ptrs[++count] = user_xauth_path;
 
 	opt = strtok(addn_xopts, " ");
 	while (opt) {

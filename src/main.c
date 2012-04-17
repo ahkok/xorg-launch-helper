@@ -133,8 +133,6 @@ int main(int argc, char **argv)
 	// close_consolekit_session();
 	close_pam_session();
 
-	unlink(xauth_cookie_file);
-
 	/* Make sure that we clean up after ourselves */
 	sleep(1);
 

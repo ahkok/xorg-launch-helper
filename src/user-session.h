@@ -14,9 +14,6 @@ extern struct passwd *pass;
 
 extern char displaydev[];
 extern char displayname[];
-extern char xauth_cookie_file[];
-extern Xauth x_auth;
-extern char user_xauth_path[];
 
 extern int tty;
 extern char session[];
@@ -36,7 +33,6 @@ extern void close_pam_session(void);
 extern void switch_to_user(void);
 extern void setup_user_environment(void);
 extern void set_tty(void);
-extern void setup_xauth(void);
 extern void start_X_server(void);
 extern void wait_for_X_signal(void);
 extern void wait_for_session_exit(void);

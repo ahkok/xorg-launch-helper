@@ -12,9 +12,6 @@ AC_CONFIG_HEADERS([config.h])
 AC_PROG_CC
 AC_PROG_INSTALL
 
-# FIXME: Replace `main' with a function in `-lXau':
-AC_CHECK_LIB([Xau], [main], ,
-	     AC_MSG_ERROR([libXau is required but was not found]))
 # FIXME: Replace `main' with a function in `-lpam':
 AC_CHECK_LIB([pam], [main], ,
 	     AC_MSG_ERROR([libpam is required but was not found]))

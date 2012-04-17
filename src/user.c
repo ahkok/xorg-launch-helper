@@ -33,8 +33,6 @@
 static int uid;
 struct passwd *pass;
 
-char user_xauth_path[PATH_MAX];
-
 static void do_env(void)
 {
 	char buf[PATH_MAX];
@@ -54,8 +52,6 @@ static void do_env(void)
 	setenv("DISPLAY", displayname, 1);
 	snprintf(buf, PATH_MAX, "/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin:%s/bin", pass->pw_dir);
 	setenv("PATH", buf, 1);
-	snprintf(user_xauth_path, PATH_MAX, "%s/.Xauthority", pass->pw_dir);
-	setenv("XAUTHORITY", user_xauth_path, 1);
 
 	file = popen("/bin/bash -l -c export", "r");
 	if (!file)
@@ -142,15 +138,6 @@ void switch_to_user(void)
 	set_i18n();
 
 	ret = chdir(pass->pw_dir);
-
-	setup_xauth();
-
-	fp = fopen(user_xauth_path, "w");
-	if (fp) {
-		if (XauWriteAuth(fp, &x_auth) != 1)
-			lprintf("Unable to write .Xauthority");
-		fclose(fp);
-	}
 
 	d_out();
 }
