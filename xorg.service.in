@@ -1,0 +1,14 @@
+
+#
+# Minimal Xorg service file - launches Xorg as a service unit
+#
+
+[Unit]
+Description=Xorg server launch helper
+Wants=syslog.target dbus.service 
+
+[Service]
+ExecStart=@prefix@/bin/xorg-launch-helper
+Restart=always
+RestartSec=10
+
