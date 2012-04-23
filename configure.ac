@@ -21,13 +21,13 @@ AC_CHECK_LIB([rt], [main], ,
 
 PKG_CHECK_MODULES([SYSTEMD], [systemd])
 
-AC_ARG_WITH([systemdunitdir], AC_HELP_STRING([--with-systemdunitdir=DIR],
-	[path to systemd service directory]), [path_systemdunit=${withval}],
-	[path_systemdunit="`$PKG_CONFIG --variable=systemdsystemunitdir systemd`"])
-if (test -n "${path_systemdunit}"); then
-SYSTEMD_UNITDIR="${path_systemdunit}"
-AC_SUBST(SYSTEMD_UNITDIR)
-AM_CONDITIONAL(SYSTEMD, test -n "${path_systemdunit}")
+AC_ARG_WITH([systemduserunitdir], AC_HELP_STRING([--with-systemduserunitdir=DIR],
+	[path to systemd user service directory]), [path_systemduserunit=${withval}],
+	[path_systemduserunit="`$PKG_CONFIG --variable=systemduserunitdir systemd`"])
+if (test -n "${path_systemduserunit}"); then
+SYSTEMD_USERUNITDIR="${path_systemduserunit}"
+AC_SUBST(SYSTEMD_USERUNITDIR)
+AM_CONDITIONAL(SYSTEMD, test -n "${path_systemduserunit}")
 fi
 
 # Checks for header files.
