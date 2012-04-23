@@ -13,131 +13,139 @@
  */
 
 #include <unistd.h>
+#include <sys/ioctl.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <signal.h>
+#include <pthread.h>
+#include <string.h>
+#include <linux/limits.h>
+#include <linux/vt.h>
+#include <linux/kd.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <sys/utsname.h>
 #include <pwd.h>
-
-#include "user-session.h"
-
-int tty = 1;
-char username[256] = DEFAULT_USERNAME;
-char dpinum[256] = "auto";
-char addn_xopts[256] = "";
-int session_pid;
+#include <time.h>
 
 
-static void
-start_systemd_session(void)
+static char displayname[256] = ":0";   /* ":0" */
+static int tty = 1; /* tty1 */
+
+static pthread_mutex_t notify_mutex = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t notify_condition = PTHREAD_COND_INITIALIZER;
+
+
+static void usr1handler(int foo)
 {
-	char *ptrs[3];
-	int ret;
+	/* Got the signal from the X server that it's ready */
+	if (foo++) foo--; /*  shut down warning */
 
-	ret = fork();
-	if (ret) {
-		session_pid = ret;
-		return; /* parent remains active */
-	}
-
-	ret = system("/usr/bin/xdg-user-dirs-update");
-	if (ret)
-		lprintf("/usr/bin/xdg-user-dirs-update failed");
-
-	ptrs[0] = strdup("/usr/lib/systemd/systemd");
-	ptrs[1] = strdup("--user");
-	ptrs[2] = NULL;
-	ret = execv(ptrs[0], ptrs);
-
-	if (ret != EXIT_SUCCESS)
-		lprintf("Failed to start systemd --user");
-
-	return;
+	pthread_mutex_lock(&notify_mutex);
+	pthread_cond_signal(&notify_condition);
+	pthread_mutex_unlock(&notify_mutex);
 }
 
-/*
- * Launch apps that form the user's X session
- */
-static void
-launch_user_session(void)
-{
-	char xhost_cmd[80];
 
-	dprintf("entering launch_user_session()");
-
-	setup_user_environment();
-
-	start_systemd_session();
-
-	/* finally, set local username to be allowed at any time,
-	 * which is not depenedent on hostname changes */
-	snprintf(xhost_cmd, 80, "/usr/bin/xhost +SI:localuser:%s",
-		 pass->pw_name);
-	if (system(xhost_cmd) != 0)
-		lprintf("%s failed", xhost_cmd);
-
-	dprintf("leaving launch_user_session()");
-}
 
 int main(int argc, char **argv)
 {
-	/*
-	 * General objective:
-	 * Do the things that need root privs first,
-	 * then switch to the final user ASAP.
-	 *
-	 * Once we're at the target user ID, we need
-	 * to start X since that's the critical element
-	 * from that point on.
-	 *
-	 * While X is starting, we can do the things
-	 * that we need to do as the user UID, but that
-	 * don't need X running yet.
-	 *
-	 * We then wait for X to signal that it's ready
-	 * to draw stuff.
-	 *
-	 * Once X is running, we set up the ConsoleKit session,
-	 * check if the screensaver needs to lock the screen
-	 * and then start the window manager.
-	 * After that we go over the autostart .desktop files
-	 * to launch the various autostart processes....
-	 * ... and we're done.
-	 */
+	struct sigaction usr1;
+	char *xserver = NULL;
+	int ret;
+	char vt[80];
+	char xorg_log[PATH_MAX];
+	struct stat statbuf;
+	char *ptrs[32];
+	int count = 0;
+	char all[PATH_MAX] = "";
+	int i;
 
-	pass = getpwnam(username);
-	
-	set_tty();
+	/* Step 1: arm the signal */
+	memset(&usr1, 0, sizeof(struct sigaction));
+	usr1.sa_handler = usr1handler;
+	sigaction(SIGUSR1, &usr1, NULL);
 
-	setup_pam_session();
+	/* Step 2: fork */
+	ret = fork();
+	if (ret) {
+		struct timespec tv;
 
-	switch_to_user();
+		fprintf(stderr, "Started Xorg[%d]", ret);
 
-	start_X_server();
+		/* setup sighandler for main thread */
+		clock_gettime(CLOCK_REALTIME, &tv);
+		tv.tv_sec += 10;
 
-	/*
-	 * These steps don't need X running
-	 * so can happen while X is talking to the
-	 * hardware
-	 */
-	wait_for_X_signal();
+		pthread_mutex_lock(&notify_mutex);
+		pthread_cond_timedwait(&notify_condition, &notify_mutex, &tv);
+		pthread_mutex_unlock(&notify_mutex);
 
-	launch_user_session();
+		//FIXME - return an error code if timer expired instead.
+		exit(EXIT_SUCCESS);
+	}
+
+	/* if we get here we're the child */
+
+	/* Step 3: find the X server */
 
 	/*
-	 * The desktop session runs here
+	 * set the X server sigchld to SIG_IGN, that's the
+         * magic to make X send the parent the signal.
 	 */
-	wait_for_X_exit();
+	signal(SIGUSR1, SIG_IGN);
 
-	set_text_mode();
+	if (!xserver) {
+		if (!access("/usr/bin/Xorg", X_OK))
+			xserver = "/usr/bin/Xorg";
+		else if (!access("/usr/bin/X", X_OK))
+			xserver = "/usr/bin/X";
+		else {
+			fprintf(stderr, "No X server found!");
+			exit(EXIT_FAILURE);
+		}
+	}
 
-	// close_consolekit_session();
-	close_pam_session();
+	/* assemble command line */
+	memset(ptrs, 0, sizeof(ptrs));
 
-	/* Make sure that we clean up after ourselves */
-	sleep(1);
+	ptrs[0] = xserver;
 
-	lprintf("Terminating user-session and all children");
-	kill(0, SIGKILL);
+	ptrs[++count] = displayname;
 
-	return EXIT_SUCCESS;
+	/* non-suid root Xorg? */
+	ret = stat(xserver, &statbuf);
+	if (!(!ret && (statbuf.st_mode & S_ISUID))) {
+		snprintf(xorg_log, PATH_MAX, "%s/.Xorg.0.log", getenv("HOME"));
+		ptrs[++count] = strdup("-logfile");
+		ptrs[++count] = xorg_log;
+	} else {
+		fprintf(stderr, "WARNING: Xorg is setuid root - bummer.");
+	}
+
+	ptrs[++count] = strdup("-nolisten");
+	ptrs[++count] = strdup("tcp");
+
+	ptrs[++count] = strdup("-noreset");
+
+	for (i = 1; i < argc; i++)
+		ptrs[++count] = strdup(argv[i]);
+
+	snprintf(vt, 80, "vt%d", tty);
+	ptrs[++count] = vt;
+
+	for (i = 0; i <= count; i++) {
+		strncat(all, ptrs[i], PATH_MAX - strlen(all) - 1);
+		if (i < count)
+			strncat(all, " ", PATH_MAX - strlen(all) - 1);
+	}
+	fprintf(stderr, "starting X server with: \"%s\"", all);
+
+	execv(ptrs[0], ptrs);
+
+	exit(EXIT_FAILURE);
 }

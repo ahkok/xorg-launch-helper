@@ -15,5 +15,5 @@ src/.deps/
 src/Makefile
 src/Makefile.in
 stamp-h1
-user-session.service
-user-session-*.tar.*
+xorg.service
+xorg-launch-helper-*.tar.*

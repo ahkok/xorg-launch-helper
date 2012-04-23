@@ -1,6 +1,5 @@
 
-bin_PROGRAMS = user-session
-user_session_SOURCES = lib.c pam.c user.c xserver.c main.c
+bin_PROGRAMS = xorg-launch-helper
+xorg_launch_helper_SOURCES = main.c
 
-noinst_HEADERS = user-session.h
 
