@@ -13,7 +13,6 @@
 
 [Unit]
 Description=Xorg server launch helper
-Wants=dbus.service 
 Before=xorg.target
 
 [Service]
