@@ -32,4 +32,8 @@ Download:
 
 Release tarballs can be downloaded here:
 
-http://foo-projects.org/~sofar/xorg-launch-helper
+    http://foo-projects.org/~sofar/xorg-launch-helper
+
+Source code is hosted here:
+
+    git://github.com/sofar/xorg-launch-helper.git
