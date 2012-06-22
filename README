@@ -1,0 +1,35 @@
+
+xorg-launch-helper
+==================
+
+About:
+
+Xorg-launch-helper is a small utility that transforms the X server
+process (XOrg) into a daemon that can be used to make applications
+wait with starting until XOrg is ready for X11 connections.
+
+The utility starts and forks the XOrg server and listens for a
+signal from the XOrg server. At this point, the utility exits
+and this mimics a forking daemon. The systemd process notices
+the fork/exec, and because the xorg.service file tells systemd
+that Type=forking, systemd understands that the XOrg service
+unit is now active.
+
+This mechanism can be used to delay the starting up of services
+that require a working X11 display server, such as any form
+of graphical process or X11 window manager.
+
+
+Origin:
+
+xorg-launch-helper is a minimal version of uxlaunch - a replacement
+session launcher Arjan van der Ven and me originally wrote for
+Moblin. With systemd, most of the uxlaunch code has become obsolete,
+and systemd does almost everything a lot better.
+
+
+Download:
+
+Release tarballs can be downloaded here:
+
+http://foo-projects.org/~sofar/xorg-launch-helper
