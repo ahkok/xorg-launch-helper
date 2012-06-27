@@ -17,7 +17,7 @@ Before=xorg.target
 
 [Service]
 Type=forking
-ExecStart=@prefix@/bin/xorg-launch-helper
+ExecStart=@prefix@/bin/xorg-launch-helper vt1
 Restart=always
 RestartSec=10
 

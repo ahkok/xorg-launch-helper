@@ -34,7 +34,6 @@
 
 
 static char displayname[256] = ":0";   /* ":0" */
-static int tty = 1; /* tty1 */
 
 static pthread_mutex_t notify_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t notify_condition = PTHREAD_COND_INITIALIZER;
@@ -57,7 +56,6 @@ int main(int argc, char **argv)
 	struct sigaction usr1;
 	char *xserver = NULL;
 	int ret;
-	char vt[80];
 	char xorg_log[PATH_MAX];
 	struct stat statbuf;
 	char *ptrs[32];
@@ -134,9 +132,6 @@ int main(int argc, char **argv)
 
 	for (i = 1; i < argc; i++)
 		ptrs[++count] = strdup(argv[i]);
-
-	snprintf(vt, 80, "vt%d", tty);
-	ptrs[++count] = vt;
 
 	for (i = 0; i <= count; i++) {
 		strncat(all, ptrs[i], PATH_MAX - strlen(all) - 1);
