@@ -31,6 +31,7 @@
 #include <sys/utsname.h>
 #include <pwd.h>
 #include <time.h>
+#include <errno.h>
 
 
 static char displayname[256] = ":0";   /* ":0" */
@@ -74,8 +75,9 @@ int main(int argc, char **argv)
 	ret = fork();
 	if (ret) {
 		struct timespec tv;
+		char *xdg;
 
-		fprintf(stderr, "Started Xorg[%d]", ret);
+		fprintf(stderr, "Started Xorg[%d]\n", ret);
 
 		/* setup sighandler for main thread */
 		clock_gettime(CLOCK_REALTIME, &tv);
@@ -84,6 +86,27 @@ int main(int argc, char **argv)
 		pthread_mutex_lock(&notify_mutex);
 		pthread_cond_timedwait(&notify_condition, &notify_mutex, &tv);
 		pthread_mutex_unlock(&notify_mutex);
+
+		/* write pid file */
+		xdg = getenv("XDG_RUNTIME_DIR");
+		if (xdg && !access(xdg, W_OK)) {
+			mode_t oldm;
+			char pidfile[PATH_MAX];
+			FILE *fp;
+
+			oldm = umask(066);
+			sprintf(pidfile, "%s/Xorg.pid", xdg);
+			fp = fopen(pidfile, "w");
+			if (!fp)
+				perror("fopen");
+			else {
+				fprintf(fp, "%d\n", ret);
+				fclose(fp);
+			}
+			umask(oldm);
+		} else
+			fprintf(stderr,
+				"Fail to create pidfile, either XDG_RUNTIME_DIR is NULL, or do not have access.\n");
 
 		//FIXME - return an error code if timer expired instead.
 		exit(EXIT_SUCCESS);
