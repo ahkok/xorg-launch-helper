@@ -74,8 +74,11 @@ int main(int argc, char **argv)
 	ret = fork();
 	if (ret) {
 		struct timespec tv;
+		char *xdg;
+		char pidfile[PATH_MAX];
+		FILE *fp;
 
-		fprintf(stderr, "Started Xorg[%d]", ret);
+		fprintf(stderr, "Started Xorg[%d]\n", ret);
 
 		/* setup sighandler for main thread */
 		clock_gettime(CLOCK_REALTIME, &tv);
@@ -84,6 +87,21 @@ int main(int argc, char **argv)
 		pthread_mutex_lock(&notify_mutex);
 		pthread_cond_timedwait(&notify_condition, &notify_mutex, &tv);
 		pthread_mutex_unlock(&notify_mutex);
+
+		xdg = getenv("XDG_RUNTIME_DIR");
+		if (!xdg) {
+			fprintf(stderr, "Unable to create pidfile: XDG_RUNTIME_DIR is not set.\n");
+			exit(EXIT_FAILURE);
+		}
+
+		snprintf(pidfile, PATH_MAX, "%s/Xorg.pid", xdg);
+		fp = fopen(pidfile, "w");
+		if (!fp) {
+			fprintf(stderr, "Unable to write pidfile.\n");
+			exit(EXIT_FAILURE);
+		}
+		fprintf(fp, "%d\n", ret);
+		fclose(fp);
 
 		//FIXME - return an error code if timer expired instead.
 		exit(EXIT_SUCCESS);
