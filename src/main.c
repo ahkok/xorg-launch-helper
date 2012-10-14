@@ -29,39 +29,42 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/utsname.h>
-#include <pwd.h>
-#include <time.h>
+#include <systemd/sd-daemon.h>
 
-
-static char displayname[256] = ":0";   /* ":0" */
-static int tty = 1; /* tty1 */
 
 static pthread_mutex_t notify_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t notify_condition = PTHREAD_COND_INITIALIZER;
 
+static int xpid;
 
 static void usr1handler(int foo)
 {
 	/* Got the signal from the X server that it's ready */
-	if (foo++) foo--; /*  shut down warning */
+	if (foo++) foo--;
+
+	sd_notify(0, "READY=1");
 
 	pthread_mutex_lock(&notify_mutex);
 	pthread_cond_signal(&notify_condition);
 	pthread_mutex_unlock(&notify_mutex);
 }
 
+static void termhandler(int foo)
+{
+	if (foo++) foo--;
+
+	kill(xpid, SIGTERM);
+}
 
 
 int main(int argc, char **argv)
 {
 	struct sigaction usr1;
+	struct sigaction term;
 	char *xserver = NULL;
-	int ret;
-	char vt[80];
-	char xorg_log[PATH_MAX];
-	struct stat statbuf;
 	char *ptrs[32];
 	int count = 0;
+	pid_t pid;
 	char all[PATH_MAX] = "";
 	int i;
 
@@ -71,45 +74,41 @@ int main(int argc, char **argv)
 	sigaction(SIGUSR1, &usr1, NULL);
 
 	/* Step 2: fork */
-	ret = fork();
-	if (ret) {
+	pid = fork();
+	if (pid) {
 		struct timespec tv;
-		char *xdg;
-		char pidfile[PATH_MAX];
-		FILE *fp;
+		int err;
+		int status;
 
-		fprintf(stderr, "Started Xorg[%d]\n", ret);
+		xpid = pid;
 
 		/* setup sighandler for main thread */
 		clock_gettime(CLOCK_REALTIME, &tv);
 		tv.tv_sec += 10;
 
 		pthread_mutex_lock(&notify_mutex);
-		pthread_cond_timedwait(&notify_condition, &notify_mutex, &tv);
+		err = pthread_cond_timedwait(&notify_condition, &notify_mutex, &tv);
 		pthread_mutex_unlock(&notify_mutex);
 
-		xdg = getenv("XDG_RUNTIME_DIR");
-		if (!xdg) {
-			fprintf(stderr, "Unable to create pidfile: XDG_RUNTIME_DIR is not set.\n");
+		if (err == ETIMEDOUT) {
+			fprintf(stderr, "X server startup timed out (10secs). This indicates an"
+				"an issue in the server configuration or drivers.\n");
 			exit(EXIT_FAILURE);
 		}
 
-		snprintf(pidfile, PATH_MAX, "%s/Xorg.pid", xdg);
-		fp = fopen(pidfile, "w");
-		if (!fp) {
-			fprintf(stderr, "Unable to write pidfile.\n");
-			exit(EXIT_FAILURE);
-		}
-		fprintf(fp, "%d\n", ret);
-		fclose(fp);
+		/* handle TERM gracefully and pass it on to xpid */
+		memset(&term, 0, sizeof(struct sigaction));
+		term.sa_handler = termhandler;
+		sigaction(SIGTERM, &term, NULL);
 
-		//FIXME - return an error code if timer expired instead.
-		exit(EXIT_SUCCESS);
+		/* sit and wait for Xorg to exit */
+		pid = waitpid(xpid, &status, 0);
+		if (WIFEXITED(status))
+			exit(WEXITSTATUS(status));
+		exit(EXIT_FAILURE);
 	}
 
 	/* if we get here we're the child */
-
-	/* Step 3: find the X server */
 
 	/*
 	 * set the X server sigchld to SIG_IGN, that's the
@@ -117,6 +116,7 @@ int main(int argc, char **argv)
 	 */
 	signal(SIGUSR1, SIG_IGN);
 
+	/* Step 3: find the X server */
 	if (!xserver) {
 		if (!access("/usr/bin/Xorg", X_OK))
 			xserver = "/usr/bin/Xorg";
@@ -133,37 +133,18 @@ int main(int argc, char **argv)
 
 	ptrs[0] = xserver;
 
-	ptrs[++count] = displayname;
-
-	/* non-suid root Xorg? */
-	ret = stat(xserver, &statbuf);
-	if (!(!ret && (statbuf.st_mode & S_ISUID))) {
-		snprintf(xorg_log, PATH_MAX, "%s/.Xorg.0.log", getenv("HOME"));
-		ptrs[++count] = strdup("-logfile");
-		ptrs[++count] = xorg_log;
-	} else {
-		fprintf(stderr, "WARNING: Xorg is setuid root - bummer.");
-	}
-
-	ptrs[++count] = strdup("-nolisten");
-	ptrs[++count] = strdup("tcp");
-
-	ptrs[++count] = strdup("-noreset");
-
 	for (i = 1; i < argc; i++)
 		ptrs[++count] = strdup(argv[i]);
-
-	snprintf(vt, 80, "vt%d", tty);
-	ptrs[++count] = vt;
 
 	for (i = 0; i <= count; i++) {
 		strncat(all, ptrs[i], PATH_MAX - strlen(all) - 1);
 		if (i < count)
 			strncat(all, " ", PATH_MAX - strlen(all) - 1);
 	}
-	fprintf(stderr, "starting X server with: \"%s\"", all);
 
+	fprintf(stderr, "Starting Xorg server with: \"%s\"", all);
 	execv(ptrs[0], ptrs);
+	fprintf(stderr, "Failed to execv() the X server.\n");
 
 	exit(EXIT_FAILURE);
 }

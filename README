@@ -9,11 +9,10 @@ process (XOrg) into a daemon that can be used to make applications
 wait with starting until XOrg is ready for X11 connections.
 
 The utility starts and forks the XOrg server and listens for a
-signal from the XOrg server. At this point, the utility exits
-and this mimics a forking daemon. The systemd process notices
-the fork/exec, and because the xorg.service file tells systemd
-that Type=forking, systemd understands that the XOrg service
-unit is now active.
+signal from the XOrg server. At this point, the utility signals
+systemd READY through sd_notify(). At this point systemd
+will start units that have an explicit ordering configured
+to be after the xorg.target.
 
 This mechanism can be used to delay the starting up of services
 that require a working X11 display server, such as any form
