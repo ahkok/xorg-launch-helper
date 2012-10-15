@@ -17,6 +17,7 @@ Before=xorg.target
 
 [Service]
 Type=notify
+KillMode=process
 ExecStart=@prefix@/bin/xorg-launch-helper :0 -nolisten tcp -noreset vt1
 Restart=always
 RestartSec=10
