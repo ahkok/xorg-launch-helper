@@ -17,6 +17,6 @@ src/Makefile.in
 src/main.o
 src/xorg-launch-helper
 stamp-h1
-xorg.service
+xorg@.service
 xorg.target
 xorg-launch-helper-*.tar.*

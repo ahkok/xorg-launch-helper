@@ -2,7 +2,7 @@
 EXTRA_DIST = AUTHORS COPYING INSTALL
 
 systemduserunitdir = @SYSTEMD_USERUNITDIR@
-systemduserunit_DATA = xorg.service xorg.target
+systemduserunit_DATA = xorg@.service xorg.target
 
 systemduserunit-install-hook:
 	mkdir -p $(DESTDIR)$(systemduserunitdir)/xorg.target.wants

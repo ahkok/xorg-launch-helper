@@ -41,7 +41,7 @@ AC_FUNC_FORK
 AC_CHECK_FUNCS([clock_gettime memset strdup])
 
 AC_OUTPUT([
-xorg.service
+xorg@.service
 xorg.target
 ])
 

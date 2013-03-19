@@ -17,7 +17,10 @@ Before=xorg.target
 
 [Service]
 Type=notify
-ExecStart=@prefix@/bin/xorg-launch-helper :0 -nolisten tcp -noreset vt1
+StandardInput=tty-force
+ExecStart=@prefix@/bin/xorg-launch-helper %i -nolisten tcp -noreset
+ExecStartPost=/usr/bin/systemctl --user set-environment DISPLAY=%i
+ExecStop=/usr/bin/systemctl --user unset-environment DISPLAY
 Restart=always
 RestartSec=10
 
