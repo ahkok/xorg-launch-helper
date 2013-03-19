@@ -5,6 +5,7 @@
  * Authors:
  *     Auke Kok <auke@linux.intel.com>
  *     Arjan van de Ven <arjan@linux.intel.com>
+ *     Ben Boeckel <mathstuf@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
