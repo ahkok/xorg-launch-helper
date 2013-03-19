@@ -214,7 +214,7 @@ int main(int argc, char **argv)
 		}
 	}
 
-	fprintf(stderr, "Starting Xorg server with: \"%s\"", all);
+	fprintf(stderr, "Starting Xorg server with: \"%s\"\n", all);
 	execv(ptrs[0], ptrs);
 	fprintf(stderr, "Failed to execv() the X server.\n");
 
