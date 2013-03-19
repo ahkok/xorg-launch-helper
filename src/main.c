@@ -18,6 +18,7 @@
 #include <sys/types.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -68,6 +69,8 @@ int main(int argc, char **argv)
 	pid_t pid;
 	char all[PATH_MAX] = "";
 	int i;
+	int have_display;
+	char disp_path[PATH_MAX];
 
 	/* Step 1: arm the signal */
 	memset(&usr1, 0, sizeof(struct sigaction));
@@ -133,6 +136,49 @@ int main(int argc, char **argv)
 	memset(ptrs, 0, sizeof(ptrs));
 
 	ptrs[0] = xserver;
+
+	/* Step 4: find an available DISPLAY (if not given) */
+	have_display = 0;
+
+	if (1 < argc) {
+		/* Check whether the first argument (which has to be the
+		 * display). If it doesn't match ":[0-9]+", we assume it is
+		 * *not* a valid DISPLAY and generate our own. */
+		if (*argv[1] == ':') {
+			char* ptr;
+
+			strtoul(argv[1] + 1, &ptr, 10);
+
+			if (!*ptr)
+				have_display = 1;
+		}
+	}
+
+	/* Let's generate our own display string */
+	if (!have_display) {
+		struct stat buf;
+		int sz;
+
+		for (i = 0; i < INT_MAX; ++i) {
+			sz = snprintf(disp_path, PATH_MAX, "/tmp/.X%d-lock", i);
+			disp_path[sz] = '\0';
+
+			if (lstat(disp_path, &buf)) {
+				if (errno == ENOENT)
+					break;
+			}
+		}
+
+		if (i == INT_MAX) {
+			fprintf(stderr, "Failed to find an available DISPLAY!");
+			exit(EXIT_FAILURE);
+		}
+
+		sz = snprintf(disp_path, PATH_MAX, ":%d", i);
+		disp_path[sz] = '\0';
+
+		ptrs[++count] = disp_path;
+	}
 
 	for (i = 1; i < argc; i++)
 		ptrs[++count] = strdup(argv[i]);
