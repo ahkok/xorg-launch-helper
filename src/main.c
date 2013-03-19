@@ -71,6 +71,7 @@ int main(int argc, char **argv)
 	int i;
 	int have_display;
 	char disp_path[PATH_MAX];
+	char vtname[13]; /* 13 == 2 + 1 + strlen(ULONG_MAX) */
 
 	/* Step 1: arm the signal */
 	memset(&usr1, 0, sizeof(struct sigaction));
@@ -187,6 +188,29 @@ int main(int argc, char **argv)
 		strncat(all, ptrs[i], PATH_MAX - strlen(all) - 1);
 		if (i < count)
 			strncat(all, " ", PATH_MAX - strlen(all) - 1);
+	}
+
+	/* Step 5: Spawn on the current TTY (if possible) */
+	if (isatty(STDIN_FILENO)) {
+		char* tty;
+
+		tty = ttyname(STDIN_FILENO);
+
+		if (!strncmp("/dev/tty", tty, 8)) {
+			unsigned long vtnum;
+			char *ptr;
+
+			vtnum = strtoul(tty + 8, &ptr, 10);
+
+			if (!ptr) {
+				int sz;
+
+				sz = snprintf(vtname, 13, "vt%lu", vtnum);
+				vtname[sz] = '\0';
+
+				ptrs[++count] = vtname;
+			}
+		}
 	}
 
 	fprintf(stderr, "Starting Xorg server with: \"%s\"", all);
