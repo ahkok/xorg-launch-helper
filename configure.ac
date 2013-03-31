@@ -12,9 +12,6 @@ AC_CONFIG_HEADERS([config.h])
 AC_PROG_CC
 AC_PROG_INSTALL
 
-# FIXME: Replace `main' with a function in `-lpthread':
-AC_CHECK_LIB([pthread], [main], ,
-	     AC_MSG_ERROR([libpthread is required but was not found]))
 # FIXME: Replace `main' with a function in `-lrt':
 AC_CHECK_LIB([rt], [main], ,
 	     AC_MSG_ERROR([librt is required but was not found]))
