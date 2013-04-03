@@ -22,8 +22,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <signal.h>
-#include <pthread.h>
 #include <string.h>
+#include <time.h>
+#include <assert.h>
 #include <linux/limits.h>
 #include <linux/vt.h>
 #include <linux/kd.h>
@@ -33,22 +34,7 @@
 #include <systemd/sd-daemon.h>
 
 
-static pthread_mutex_t notify_mutex = PTHREAD_MUTEX_INITIALIZER;
-static pthread_cond_t notify_condition = PTHREAD_COND_INITIALIZER;
-
 static int xpid;
-
-static void usr1handler(int foo)
-{
-	/* Got the signal from the X server that it's ready */
-	if (foo++) foo--;
-
-	sd_notify(0, "READY=1");
-
-	pthread_mutex_lock(&notify_mutex);
-	pthread_cond_signal(&notify_condition);
-	pthread_mutex_unlock(&notify_mutex);
-}
 
 static void termhandler(int foo)
 {
@@ -57,10 +43,8 @@ static void termhandler(int foo)
 	kill(xpid, SIGTERM);
 }
 
-
 int main(int argc, char **argv)
 {
-	struct sigaction usr1;
 	struct sigaction term;
 	char *xserver = NULL;
 	char *ptrs[32];
@@ -68,34 +52,63 @@ int main(int argc, char **argv)
 	pid_t pid;
 	char all[PATH_MAX] = "";
 	int i;
-
-	/* Step 1: arm the signal */
-	memset(&usr1, 0, sizeof(struct sigaction));
-	usr1.sa_handler = usr1handler;
-	sigaction(SIGUSR1, &usr1, NULL);
+	sigset_t mask;
+	sigset_t oldmask;
+	/* Step 1: block sigusr1 until we wait for it */
+	sigemptyset(&mask);
+	sigaddset(&mask, SIGUSR1);
+	sigprocmask(SIG_BLOCK, &mask, &oldmask);
 
 	/* Step 2: fork */
 	pid = fork();
 	if (pid) {
-		struct timespec tv;
-		int err;
+		struct timespec starttime;
+		struct timespec timeout;
 		int status;
 
 		xpid = pid;
 
-		/* setup sighandler for main thread */
-		clock_gettime(CLOCK_REALTIME, &tv);
-		tv.tv_sec += 10;
-
-		pthread_mutex_lock(&notify_mutex);
-		err = pthread_cond_timedwait(&notify_condition, &notify_mutex, &tv);
-		pthread_mutex_unlock(&notify_mutex);
-
-		if (err == ETIMEDOUT) {
-			fprintf(stderr, "X server startup timed out (10secs). This indicates an"
-				"an issue in the server configuration or drivers.\n");
-			exit(EXIT_FAILURE);
-		}
+		/* wait up to 10 seconds for X server to start */
+		clock_gettime(CLOCK_REALTIME, &starttime);
+		timeout.tv_sec = 10;
+		timeout.tv_nsec = 0;
+		do {
+			int ret =  sigtimedwait(&mask, NULL, &timeout);
+			if (ret > 0) {
+				assert(ret == SIGUSR1);
+				/* got SIGUSR1, X server has started */
+				sd_notify(0, "READY=1");
+				break;
+			}
+			else if (errno == EINTR) {
+				struct timespec currenttime;
+				/* interrupted by other signal, update timeout and retry */
+				clock_gettime(CLOCK_REALTIME, &currenttime);
+				timeout.tv_sec = (starttime.tv_sec + 10) - currenttime.tv_sec;
+				if (currenttime.tv_nsec > starttime.tv_nsec) {
+					timeout.tv_nsec = starttime.tv_nsec + 1000000000L - currenttime.tv_nsec;
+					timeout.tv_sec--;
+				}
+				else {
+					timeout.tv_nsec = currenttime.tv_nsec - starttime.tv_nsec ;
+				}
+				/* printf("New timeout: %d s, %d ns\n",
+					(int)timeout.tv_sec, (int)timeout.tv_nsec); */
+				if (timeout.tv_sec < 0 || timeout.tv_nsec < 0) {
+					timeout.tv_sec = 0;
+					timeout.tv_nsec = 0;
+				}
+			}
+			else if (errno == EAGAIN) {
+				fprintf(stderr, "X server startup timed out (10secs). This "
+					"indicates an issue in the server configuration or drivers.\n");
+				exit(EXIT_FAILURE);
+			}
+			else {
+				perror("sigtimedwait");
+				exit(EXIT_FAILURE);
+			}
+		} while (1);
 
 		/* handle TERM gracefully and pass it on to xpid */
 		memset(&term, 0, sizeof(struct sigaction));
@@ -112,9 +125,10 @@ int main(int argc, char **argv)
 	/* if we get here we're the child */
 
 	/*
-	 * set the X server sigchld to SIG_IGN, that's the
-         * magic to make X send the parent the signal.
+	 * reset signal mask and set the X server sigchld to SIG_IGN, that's the
+	 * magic to make X send the parent the signal.
 	 */
+	sigprocmask(SIG_SETMASK, &oldmask, NULL);
 	signal(SIGUSR1, SIG_IGN);
 
 	/* Step 3: find the X server */
@@ -143,9 +157,8 @@ int main(int argc, char **argv)
 			strncat(all, " ", PATH_MAX - strlen(all) - 1);
 	}
 
-	fprintf(stderr, "Starting Xorg server with: \"%s\"", all);
+	fprintf(stderr, "Starting Xorg server with: \"%s\"\n", all);
 	execv(ptrs[0], ptrs);
 	fprintf(stderr, "Failed to execv() the X server.\n");
-
 	exit(EXIT_FAILURE);
 }
