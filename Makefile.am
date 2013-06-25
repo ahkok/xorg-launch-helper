@@ -11,6 +11,7 @@ systemduserunit-install-hook:
 install-data-hook: systemduserunit-install-hook
 
 AM_CFLAGS = $(LIBSYSTEMD_DAEMON_CFLAGS) -Wall -Wno-uninitialized
+AUTOMAKE_OPTIONS = subdir-objects
 
 bin_PROGRAMS = xorg-launch-helper
 xorg_launch_helper_SOURCES = src/main.c
