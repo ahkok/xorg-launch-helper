@@ -15,5 +15,5 @@ AUTOMAKE_OPTIONS = subdir-objects
 
 bin_PROGRAMS = xorg-launch-helper
 xorg_launch_helper_SOURCES = src/main.c
-xorg_launch_helper_LDADD = $(LIBSYSTEMD_DAEMON_LIBS)
+xorg_launch_helper_LDADD = $(LIBSYSTEMD_DAEMON_LIBS) $(PAM_LIBS)
 

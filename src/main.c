@@ -12,6 +12,8 @@
  * of the License.
  */
 
+#include <config.h>
+
 #include <unistd.h>
 #include <sys/ioctl.h>
 #include <sys/stat.h>
@@ -32,7 +34,11 @@
 #include <sys/wait.h>
 #include <sys/utsname.h>
 #include <systemd/sd-daemon.h>
-
+#ifdef XORG_PAM_APPNAME
+#include <pwd.h>
+#include <security/pam_appl.h>
+#include <security/pam_misc.h>
+#endif
 
 static int xpid;
 
@@ -43,17 +49,63 @@ static void termhandler(int foo)
 	kill(xpid, SIGTERM);
 }
 
+static int start_xserver(int argc, char **argv)
+{
+	int i;
+	int count = 0;
+	char *ptrs[32];
+	char all[PATH_MAX] = "";
+	char *xserver = NULL;
+
+	if (!xserver) {
+		if (!access("/usr/bin/Xorg", X_OK))
+			xserver = "/usr/bin/Xorg";
+		else if (!access("/usr/bin/X", X_OK))
+			xserver = "/usr/bin/X";
+		else {
+			fprintf(stderr, "No X server found!");
+			return EXIT_FAILURE;
+		}
+	}
+
+	/* assemble command line */
+	memset(ptrs, 0, sizeof(ptrs));
+
+	ptrs[0] = xserver;
+
+	for (i = 1; i < argc; i++)
+		ptrs[++count] = strdup(argv[i]);
+
+	for (i = 0; i <= count; i++) {
+		strncat(all, ptrs[i], PATH_MAX - strlen(all) - 1);
+		if (i < count)
+			strncat(all, " ", PATH_MAX - strlen(all) - 1);
+	}
+
+	fprintf(stderr, "Starting Xorg server with: \"%s\"\n", all);
+	execv(ptrs[0], ptrs);
+	fprintf(stderr, "Failed to execv() the X server.\n");
+	return EXIT_FAILURE;
+}
+
 int main(int argc, char **argv)
 {
 	struct sigaction term;
-	char *xserver = NULL;
-	char *ptrs[32];
-	int count = 0;
 	pid_t pid;
-	char all[PATH_MAX] = "";
-	int i;
 	sigset_t mask;
 	sigset_t oldmask;
+	int retval;
+#ifdef XORG_PAM_APPNAME
+	struct pam_conv conv = {
+		misc_conv,
+		NULL
+	};
+	pam_handle_t *pamh = NULL;
+	int myuid;
+	int pamval;
+	struct passwd *pw;
+#endif
+
 	/* Step 1: block sigusr1 until we wait for it */
 	sigemptyset(&mask);
 	sigaddset(&mask, SIGUSR1);
@@ -131,6 +183,7 @@ int main(int argc, char **argv)
 
 	/* if we get here we're the child */
 
+
 	/*
 	 * reset signal mask and set the X server sigchld to SIG_IGN, that's the
 	 * magic to make X send the parent the signal.
@@ -139,33 +192,31 @@ int main(int argc, char **argv)
 	signal(SIGUSR1, SIG_IGN);
 
 	/* Step 3: find the X server */
-	if (!xserver) {
-		if (!access("/usr/bin/Xorg", X_OK))
-			xserver = "/usr/bin/Xorg";
-		else if (!access("/usr/bin/X", X_OK))
-			xserver = "/usr/bin/X";
-		else {
-			fprintf(stderr, "No X server found!");
-			exit(EXIT_FAILURE);
+#ifdef XORG_PAM_APPNAME
+	/*
+	 * Authenticate with PAM using the application name
+	 */
+	myuid = getuid();
+	pw = getpwuid(myuid);
+	pamval = pam_start(XORG_PAM_APPNAME, pw->pw_name, &conv, &pamh);
+	if (pamval == PAM_SUCCESS) {
+		pamval = pam_authenticate(pamh, 0);
+		if (pamval == PAM_SUCCESS) {
+			pamval = pam_acct_mgmt(pamh, 0);
+			if (pamval == PAM_SUCCESS) {
+				pamval = pam_open_session(pamh, 0);
+				if (pamval == PAM_SUCCESS)
+					retval = start_xserver(argc, argv);
+			}
 		}
 	}
 
-	/* assemble command line */
-	memset(ptrs, 0, sizeof(ptrs));
+	if (pamh)
+		pam_end(pamh, pamval);
 
-	ptrs[0] = xserver;
+#else
+	retval = start_xserver(argc, argv);
+#endif
 
-	for (i = 1; i < argc; i++)
-		ptrs[++count] = strdup(argv[i]);
-
-	for (i = 0; i <= count; i++) {
-		strncat(all, ptrs[i], PATH_MAX - strlen(all) - 1);
-		if (i < count)
-			strncat(all, " ", PATH_MAX - strlen(all) - 1);
-	}
-
-	fprintf(stderr, "Starting Xorg server with: \"%s\"\n", all);
-	execv(ptrs[0], ptrs);
-	fprintf(stderr, "Failed to execv() the X server.\n");
-	exit(EXIT_FAILURE);
+	return retval;
 }

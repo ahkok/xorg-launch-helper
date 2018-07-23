@@ -21,6 +21,20 @@ PKG_CHECK_MODULES([LIBSYSTEMD_DAEMON], [libsystemd])
 AC_SUBST(LIBSYSTEMD_DAEMON_CFLAGS)
 AC_SUBST(LIBSYSTEMD_DAEMON_LIBS)
 
+AC_ARG_WITH([pam-appname],
+	AC_HELP_STRING([--with-pam-appname],[Application name in /etc/pam.d]),
+	[
+		pam_appname="${withval}"
+		AC_CHECK_HEADERS(
+			security/pam_modules.h security/pam_appl.h security/pam_misc.h,
+			[], [AC_MSG_ERROR([PAM headers are not installed])])
+		AC_CHECK_LIB([pam],[pam_get_user],
+			[PAM_LIBS="-lpam -lpam_misc"],
+			[AC_MSG_ERROR([PAM libraries are not installed])])
+		AC_DEFINE_UNQUOTED([XORG_PAM_APPNAME],["$pam_appname"],[Application name in /etc/pam.d])
+	])
+AC_SUBST(PAM_LIBS)
+
 AC_ARG_WITH([systemduserunitdir], AC_HELP_STRING([--with-systemduserunitdir=DIR],
 	[path to systemd user service directory]), [path_systemduserunit=${withval}],
 	[path_systemduserunit="`$PKG_CONFIG --variable=systemduserunitdir systemd`"])
