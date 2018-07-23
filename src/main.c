@@ -278,15 +278,15 @@ int main(int argc, char **argv)
 			pollval = poll(&pfd, 1, -1);
 		} while (pollval < 0 && errno == EINTR);
 
-		if (pollval == 0) {
+		if (pollval >= 0) {
 			char disp[16];
 
 			if (read(pipe_fds[0], disp, sizeof(disp)) > 0)
-				sd_notifyf(0, "READY=1\nSTATUS=Xorg server started on %s\n", disp);
+				sd_notifyf(0, "READY=1\nSTATUS=Xorg server started on DISPLAY=:%s\n", disp);
 			else
-				sd_notify(0, "READY=1\nSTATUS=Reading failed from -displayfd\n");
+				sd_notify(0, "READY=1\nSTATUS=Reading failed from -displayfd with errno %d\n", errno);
 		} else
-			sd_notify(0, "READY=1\nSTATUS=Polling failed on -displayfd\n");
+			sd_notifyf(0, "READY=1\nSTATUS=Polling failed on -displayfd with errno %d\n", errno);
 #endif
 
 		/* handle TERM gracefully and pass it on to xpid */
