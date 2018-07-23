@@ -17,7 +17,7 @@ AC_CHECK_LIB([rt], [main], ,
 	     AC_MSG_ERROR([librt is required but was not found]))
 
 PKG_CHECK_MODULES([SYSTEMD], [systemd])
-PKG_CHECK_MODULES([LIBSYSTEMD_DAEMON], [libsystemd-daemon])
+PKG_CHECK_MODULES([LIBSYSTEMD_DAEMON], [libsystemd])
 AC_SUBST(LIBSYSTEMD_DAEMON_CFLAGS)
 AC_SUBST(LIBSYSTEMD_DAEMON_LIBS)
 
