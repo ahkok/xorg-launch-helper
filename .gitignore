@@ -1,4 +1,6 @@
 *~
+*.orig
+*.rej
 Makefile
 Makefile.in
 aclocal.m4
