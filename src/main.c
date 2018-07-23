@@ -65,10 +65,11 @@ int main(int argc, char **argv)
 		struct timespec starttime;
 		struct timespec timeout;
 		int status;
+		int retries = 3;
 
 		xpid = pid;
 
-		/* wait up to 10 seconds for X server to start */
+		/* wait up to retries * 10 seconds for X server to start */
 		clock_gettime(CLOCK_REALTIME, &starttime);
 		timeout.tv_sec = 10;
 		timeout.tv_nsec = 0;
@@ -100,9 +101,15 @@ int main(int argc, char **argv)
 				}
 			}
 			else if (errno == EAGAIN) {
+				retries--;
 				fprintf(stderr, "X server startup timed out (10secs). This "
-					"indicates an issue in the server configuration or drivers.\n");
-				exit(EXIT_FAILURE);
+					"indicates an issue in the server configuration or drivers "
+					"or slow startup, %s...\n", (retries ? "retrying" : "exiting"));
+				if (!retries)
+					exit(EXIT_FAILURE);
+				/* Make sure the timeout is restarted from scratch. */
+				timeout.tv_sec = 10;
+				timeout.tv_nsec = 0;
 			}
 			else {
 				perror("sigtimedwait");
