@@ -9,4 +9,6 @@
 
 [Unit]
 Description=The basic Xorg server
+Conflicts=rescue.target
+AllowIsolate=yes
 
