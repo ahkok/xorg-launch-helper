@@ -22,7 +22,7 @@ AC_SUBST(LIBSYSTEMD_DAEMON_CFLAGS)
 AC_SUBST(LIBSYSTEMD_DAEMON_LIBS)
 
 AC_ARG_WITH([pam-appname],
-	AC_HELP_STRING([--with-pam-appname],[Application name in /etc/pam.d]),
+	AC_HELP_STRING([--with-pam-appname=...],[Application name in /etc/pam.d]),
 	[
 		pam_appname="${withval}"
 		AC_CHECK_HEADERS(
@@ -34,6 +34,10 @@ AC_ARG_WITH([pam-appname],
 		AC_DEFINE_UNQUOTED([XORG_PAM_APPNAME],["$pam_appname"],[Application name in /etc/pam.d])
 	])
 AC_SUBST(PAM_LIBS)
+
+AC_ARG_ENABLE([plymouth],
+	AC_HELP_STRING([--enable-plymouth],[Enable Plymouth smooth transition]),
+	[AC_DEFINE([HAVE_PLYMOUTH],[1],[Enable Plymouth smooth transition])])
 
 AC_ARG_WITH([systemduserunitdir], AC_HELP_STRING([--with-systemduserunitdir=DIR],
 	[path to systemd user service directory]), [path_systemduserunit=${withval}],
