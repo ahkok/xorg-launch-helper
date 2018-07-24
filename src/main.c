@@ -366,7 +366,6 @@ int main(int argc, char **argv)
 			pollval = poll(&pfd, 1, -1);
 		} while (pollval < 0 && errno == EINTR);
 
-
 		if (pollval >= 0) {
 			char disp[16];
 
