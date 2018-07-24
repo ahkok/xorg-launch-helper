@@ -163,7 +163,6 @@ static void xdg_vtnr_current_vt(int vtnr)
 			return;
 
 		close (fd);
-		fd = -1;
 
 		vtnr = vt_state.v_active;
 	}
@@ -379,12 +378,21 @@ int main(int argc, char **argv)
 				if (pl_is_running) {
 					char xdisp[24];
 					Display *display;
+					int retries = 10;
 
 					sprintf(xdisp, ":%s", disp);
 
-					display = XOpenDisplay(xdisp);
-					slave_save_root_windows(display);
-					XCloseDisplay(display);
+					do {
+						display = XOpenDisplay(xdisp);
+						if (display) {
+							slave_save_root_windows(display);
+							XCloseDisplay(display);
+							break;
+						}
+
+						sleep(1);
+						retries--;
+					} while (!display && retries);
 				}
 
 				sd_notifyf(0, "READY=1\nSTATUS=Xorg server started on DISPLAY=:%s\n", disp);
@@ -405,12 +413,11 @@ int main(int argc, char **argv)
 		/* sit and wait for Xorg to exit */
 		pid = waitpid(xpid, &status, 0);
 		sd_notify(0, "STOPPING=1\n");
-		if (WIFEXITED(status))
-			exit(WEXITSTATUS(status));
-		exit(EXIT_FAILURE);
+		return (WIFEXITED(status) ? WEXITSTATUS(status) : EXIT_FAILURE);
 	}
 
 	/* if we get here we're the child */
+	retval = EXIT_FAILURE;
 
 #ifdef HAVE_PLYMOUTH
 	/*
