@@ -373,14 +373,15 @@ int main(int argc, char **argv)
 
 		if (pollval >= 0) {
 			char disp[16];
+			char xdisp[24];
 
 			if (read(pipe_fds[0], disp, sizeof(disp)) > 0) {
+				sprintf(xdisp, ":%s", disp);
+
 				if (pl_is_running) {
-					char xdisp[24];
 					Display *display;
 					int retries = 10;
 
-					sprintf(xdisp, ":%s", disp);
 
 					do {
 						display = XOpenDisplay(xdisp);
@@ -395,7 +396,7 @@ int main(int argc, char **argv)
 					} while (!display && retries);
 				}
 
-				sd_notifyf(0, "READY=1\nSTATUS=Xorg server started on DISPLAY=:%s\n", disp);
+				sd_notifyf(0, "READY=1\nSTATUS=Xorg server started on DISPLAY='%s'\n", xdisp);
 			} else
 				sd_notifyf(0, "READY=1\nSTATUS=Reading failed from -displayfd with errno %d\n", errno);
 		} else
