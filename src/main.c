@@ -172,7 +172,11 @@ void slave_save_root_windows(Display *display)
 }
 #endif
 
+#ifdef HAVE_PLYMOUTH
+static int start_xserver(int argc, char **argv, int pl_is_running)
+#else
 static int start_xserver(int argc, char **argv)
+#endif
 {
 	int i;
 	int count = 0;
@@ -201,6 +205,9 @@ static int start_xserver(int argc, char **argv)
 	ptrs[count] = xserver;
 
 #ifdef HAVE_PLYMOUTH
+	if (pl_is_running)
+		plymouth_prepare_for_transition();
+
 	if (getenv("XDG_VTNR") != NULL) {
 		int vt;
 
@@ -276,6 +283,7 @@ int main(int argc, char **argv)
 
 #ifdef HAVE_PLYMOUTH
 	/* Step 2: open a pipe(2) to wait for Xorg to report its DISPLAY value */
+	pl_is_running = plymouth_is_running();
 	if (pipe(pipe_fds) != 0) {
 		pipe_fds[0] = -1;
 		pipe_fds[1] = -1;
@@ -358,9 +366,6 @@ int main(int argc, char **argv)
 			pollval = poll(&pfd, 1, -1);
 		} while (pollval < 0 && errno == EINTR);
 
-		pl_is_running = plymouth_is_running();
-		if (pl_is_running)
-			plymouth_prepare_for_transition();
 
 		if (pollval >= 0) {
 			char disp[16];
@@ -440,7 +445,11 @@ int main(int argc, char **argv)
 			if (pamval == PAM_SUCCESS) {
 				pamval = pam_open_session(pamh, 0);
 				if (pamval == PAM_SUCCESS)
+#ifdef HAVE_PLYMOUTH
+					retval = start_xserver(argc, argv, pl_is_running);
+#else
 					retval = start_xserver(argc, argv);
+#endif
 			}
 		}
 	}
@@ -449,7 +458,13 @@ int main(int argc, char **argv)
 		pam_end(pamh, pamval);
 
 #else
+
+#ifdef HAVE_PLYMOUTH
+	retval = start_xserver(argc, argv, pl_is_running);
+#else
 	retval = start_xserver(argc, argv);
+#endif
+
 #endif
 
 	return retval;
