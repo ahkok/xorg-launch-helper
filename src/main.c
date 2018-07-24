@@ -112,6 +112,8 @@ static void xdg_vtnr_current_vt(pam_handle_t *pamh)
 	close (fd);
 	fd = -1;
 
+	snprintf(vt_string, sizeof(vt_string), "vt%d", vt_state.v_active);
+	setenv("XDG_VTNR", vt_string, 1);
 	snprintf(vt_string, sizeof(vt_string), "XDG_VTNR=vt%d", vt_state.v_active);
 	pam_putenv(pamh, vt_string);
 	snprintf(vt_string, sizeof(vt_string), "/dev/tty%d", vt_state.v_active);
@@ -143,6 +145,7 @@ static int start_xserver(int argc, char **argv)
 
 	ptrs[count] = xserver;
 
+#ifdef HAVE_PLYMOUTH
 	if (getenv("XDG_VTNR") != NULL) {
 		int vt;
 
@@ -156,7 +159,6 @@ static int start_xserver(int argc, char **argv)
 		}
 	}
 
-#ifdef HAVE_PLYMOUTH
 	if (pipe_fds[0] >= 0) {
 		char dispn[16];
 
