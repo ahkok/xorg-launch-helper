@@ -136,6 +136,10 @@ static int start_xserver(int argc, char **argv)
 	char *ptrs[32];
 	char all[PATH_MAX] = "";
 	char *xserver = NULL;
+#ifdef HAVE_PLYMOUTH
+	char vtnr[16];
+	char dispn[16];
+#endif
 
 	if (!xserver) {
 		if (!access("/usr/bin/Xorg", X_OK))
@@ -160,15 +164,14 @@ static int start_xserver(int argc, char **argv)
 		vt = atoi(getenv("XDG_VTNR"));
 
 		if (vt > 0 && vt < 64) {
-			char vtnr[8];
 
 			sprintf(vtnr, "vt%d", vt);
 			ptrs[++count] = vtnr;
-			fprintf(stderr, "Using XDG_VTNR=%d / vt%d!", vt, vt);
+			fprintf(stderr, "Using XDG_VTNR=%d / vt%d!\n", vt, vt);
 		} else
-			fprintf(stderr, "XDG_VTNR is invalid!");
+			fprintf(stderr, "XDG_VTNR is invalid!\n");
 	} else
-		fprintf(stderr, "XDG_VTNR is unset!");
+		fprintf(stderr, "XDG_VTNR is unset!\n");
 
 	if (getenv("XDG_SEAT") != NULL) {
 		ptrs[++count] = "-seat";
@@ -176,8 +179,6 @@ static int start_xserver(int argc, char **argv)
 	}
 
 	if (pipe_fds[0] >= 0) {
-		char dispn[16];
-
 		sprintf(dispn, "%d", pipe_fds[0]);
 		ptrs[++count] = "-displayfd";
 		ptrs[++count] = dispn;
