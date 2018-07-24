@@ -46,6 +46,9 @@
 static int xpid;
 #ifdef HAVE_PLYMOUTH
 static int pipe_fds[2];
+
+/* Set this to 0 to deduce ourselves the next available VTn */
+#define INITIAL_VT	1
 #endif
 
 static void termhandler(int foo)
@@ -95,28 +98,33 @@ static void plymouth_quit_with_transition(void)
 	pclose(fp);
 }
 
-static void xdg_vtnr_current_vt(pam_handle_t *pamh)
+static void xdg_vtnr_current_vt(pam_handle_t *pamh, int vtnr)
 {
-	int fd;
 	char vt_string[256];
-	struct vt_stat vt_state = { 0 };
 
-	fd = open ("/dev/tty0", O_RDWR | O_NOCTTY);
+	if (!vtnr) {
+		int fd;
+		struct vt_stat vt_state = { 0 };
 
-	if (fd < 0)
-		return;
+		fd = open ("/dev/tty0", O_RDWR | O_NOCTTY);
 
-	if (ioctl(fd, VT_GETSTATE, &vt_state) < 0)
-		return;
+		if (fd < 0)
+			return;
 
-	close (fd);
-	fd = -1;
+		if (ioctl(fd, VT_GETSTATE, &vt_state) < 0)
+			return;
 
-	snprintf(vt_string, sizeof(vt_string), "%d", vt_state.v_active);
+		close (fd);
+		fd = -1;
+
+		vtnr = vt_state.v_active;
+	}
+
+	snprintf(vt_string, sizeof(vt_string), "%d", vtnr);
 	setenv("XDG_VTNR", vt_string, 1);
-	snprintf(vt_string, sizeof(vt_string), "XDG_VTNR=%d", vt_state.v_active);
+	snprintf(vt_string, sizeof(vt_string), "XDG_VTNR=%d", vtnr);
 	pam_putenv(pamh, vt_string);
-	snprintf(vt_string, sizeof(vt_string), "/dev/tty%d", vt_state.v_active);
+	snprintf(vt_string, sizeof(vt_string), "/dev/tty%d", vtnr);
 	pam_set_item(pamh, PAM_TTY, vt_string);
 }
 #endif
@@ -156,8 +164,11 @@ static int start_xserver(int argc, char **argv)
 
 			sprintf(vtnr, "vt%d", vt);
 			ptrs[++count] = vtnr;
-		}
-	}
+			fprintf(stderr, "Using XDG_VTNR=%d / vt%d!", vt, vt);
+		} else
+			fprintf(stderr, "XDG_VTNR is invalid!");
+	} else
+		fprintf(stderr, "XDG_VTNR is unset!");
 
 	if (getenv("XDG_SEAT") != NULL) {
 		ptrs[++count] = "-seat";
@@ -364,7 +375,7 @@ int main(int argc, char **argv)
 		setenv("XDG_SEAT", "seat0", 1);
 		pam_putenv(pamh, "XDG_SEAT=seat0");
 		pam_putenv(pamh, "XDG_SESSION_CLASS=greeter");
-		xdg_vtnr_current_vt(pamh);
+		xdg_vtnr_current_vt(pamh, INITIAL_VT);
 
 		pamval = pam_authenticate(pamh, 0);
 		if (pamval == PAM_SUCCESS) {
