@@ -94,6 +94,29 @@ static void plymouth_quit_with_transition(void)
 
 	pclose(fp);
 }
+
+static void xdg_vtnr_current_vt(pam_handle_t *pamh)
+{
+	int fd;
+	char vt_string[256];
+	struct vt_stat vt_state = { 0 };
+
+	fd = open ("/dev/tty0", O_RDWR | O_NOCTTY);
+
+	if (fd < 0)
+		return;
+
+	if (ioctl(fd, VT_GETSTATE, &vt_state) < 0)
+		return;
+
+	close (fd);
+	fd = -1;
+
+	snprintf(vt_string, sizeof(vt_string), "XDG_VTNR=vt%d", vt_state.v_active);
+	pam_putenv(pamh, vt_string);
+	snprintf(vt_string, sizeof(vt_string), "/dev/tty%d", vt_state.v_active);
+	pam_set_item(pamh, PAM_TTY, vt_string);
+}
 #endif
 
 static int start_xserver(int argc, char **argv)
@@ -331,6 +354,10 @@ int main(int argc, char **argv)
 	pw = getpwuid(myuid);
 	pamval = pam_start(XORG_PAM_APPNAME, pw->pw_name, &conv, &pamh);
 	if (pamval == PAM_SUCCESS) {
+		pam_putenv(pamh, "XDG_SEAT=seat0");
+		pam_putenv(pamh, "XDG_SESSION_CLASS=greeter");
+		xdg_vtnr_current_vt(pamh);
+
 		pamval = pam_authenticate(pamh, 0);
 		if (pamval == PAM_SUCCESS) {
 			pamval = pam_acct_mgmt(pamh, 0);
