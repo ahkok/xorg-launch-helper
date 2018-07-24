@@ -48,10 +48,10 @@
 static int xpid;
 #ifdef HAVE_PLYMOUTH
 static int pipe_fds[2];
+#endif
 
 /* Set this to 0 to deduce ourselves the next available VTn */
 #define INITIAL_VT	1
-#endif
 
 static void termhandler(int foo)
 {
@@ -100,36 +100,6 @@ static void plymouth_quit_with_transition(void)
 	pclose(fp);
 }
 
-static void xdg_vtnr_current_vt(pam_handle_t *pamh, int vtnr)
-{
-	char vt_string[256];
-
-	if (!vtnr) {
-		int fd;
-		struct vt_stat vt_state = { 0 };
-
-		fd = open ("/dev/tty0", O_RDWR | O_NOCTTY);
-
-		if (fd < 0)
-			return;
-
-		if (ioctl(fd, VT_GETSTATE, &vt_state) < 0)
-			return;
-
-		close (fd);
-		fd = -1;
-
-		vtnr = vt_state.v_active;
-	}
-
-	snprintf(vt_string, sizeof(vt_string), "%d", vtnr);
-	setenv("XDG_VTNR", vt_string, 1);
-	snprintf(vt_string, sizeof(vt_string), "XDG_VTNR=%d", vtnr);
-	pam_putenv(pamh, vt_string);
-	snprintf(vt_string, sizeof(vt_string), "/dev/tty%d", vtnr);
-	pam_set_item(pamh, PAM_TTY, vt_string);
-}
-
 static void slave_save_root_window_of_screen(Display *display, Atom id_atom, int screen_number)
 {
 	Window root_window;
@@ -171,6 +141,42 @@ void slave_save_root_windows(Display *display)
 	XSync(display, False);
 }
 #endif
+
+#ifdef XORG_PAM_APPNAME
+static void xdg_vtnr_current_vt(pam_handle_t *pamh, int vtnr)
+#else
+static void xdg_vtnr_current_vt(int vtnr)
+#endif
+{
+	char vt_string[256];
+
+	if (!vtnr) {
+		int fd;
+		struct vt_stat vt_state = { 0 };
+
+		fd = open ("/dev/tty0", O_RDWR | O_NOCTTY);
+
+		if (fd < 0)
+			return;
+
+		if (ioctl(fd, VT_GETSTATE, &vt_state) < 0)
+			return;
+
+		close (fd);
+		fd = -1;
+
+		vtnr = vt_state.v_active;
+	}
+
+	snprintf(vt_string, sizeof(vt_string), "%d", vtnr);
+	setenv("XDG_VTNR", vt_string, 1);
+#ifdef XORG_PAM_APPNAME
+	snprintf(vt_string, sizeof(vt_string), "XDG_VTNR=%d", vtnr);
+	pam_putenv(pamh, vt_string);
+	snprintf(vt_string, sizeof(vt_string), "/dev/tty%d", vtnr);
+	pam_set_item(pamh, PAM_TTY, vt_string);
+#endif
+}
 
 #ifdef HAVE_PLYMOUTH
 static int start_xserver(int argc, char **argv, int pl_is_running)
@@ -458,6 +464,7 @@ int main(int argc, char **argv)
 
 #else
 
+	xdg_vtnr_current_vt(INITIAL_VT);
 #ifdef HAVE_PLYMOUTH
 	retval = start_xserver(argc, argv, pl_is_running);
 #else
