@@ -37,7 +37,15 @@ AC_SUBST(PAM_LIBS)
 
 AC_ARG_ENABLE([plymouth],
 	AC_HELP_STRING([--enable-plymouth],[Enable Plymouth smooth transition]),
-	[AC_DEFINE([HAVE_PLYMOUTH],[1],[Enable Plymouth smooth transition])])
+	[
+		AC_DEFINE([HAVE_PLYMOUTH],[1],[Enable Plymouth smooth transition])
+		AC_CHECK_HEADERS(
+			X11/Xlib.h X11/Xatom.h,
+			[], [AC_MSG_ERROR([X11 headers are not installed])])
+		AC_CHECK_LIB([X11],[XSync],[X11_LIBS=-lX11],
+			[AC_MSG_ERROR([X11 libraries are not installed])])
+	])
+AC_SUBST(X11_LIBS)
 
 AC_ARG_WITH([systemduserunitdir], AC_HELP_STRING([--with-systemduserunitdir=DIR],
 	[path to systemd user service directory]), [path_systemduserunit=${withval}],

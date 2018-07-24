@@ -36,6 +36,8 @@
 #include <systemd/sd-daemon.h>
 #ifdef HAVE_PLYMOUTH
 #include <poll.h>
+#include <X11/Xlib.h> /* for Display */
+#include <X11/Xatom.h> /* for XA_PIXMAP */
 #endif
 #ifdef XORG_PAM_APPNAME
 #include <pwd.h>
@@ -126,6 +128,47 @@ static void xdg_vtnr_current_vt(pam_handle_t *pamh, int vtnr)
 	pam_putenv(pamh, vt_string);
 	snprintf(vt_string, sizeof(vt_string), "/dev/tty%d", vtnr);
 	pam_set_item(pamh, PAM_TTY, vt_string);
+}
+
+static void slave_save_root_window_of_screen(Display *display, Atom id_atom, int screen_number)
+{
+	Window root_window;
+	GC gc;
+	XGCValues values;
+	Pixmap pixmap;
+	int width, height, depth;
+	root_window = RootWindow(display, screen_number);
+	width = DisplayWidth(display, screen_number);
+	height = DisplayHeight(display, screen_number);
+	depth = DefaultDepth(display, screen_number);
+	pixmap = XCreatePixmap(display, root_window, width, height, depth);
+	values.function = GXcopy;
+	values.plane_mask = AllPlanes;
+	values.fill_style = FillSolid;
+	values.subwindow_mode = IncludeInferiors;
+	gc = XCreateGC(display, root_window, GCFunction | GCPlaneMask | GCFillStyle | GCSubwindowMode, &values);
+	if (XCopyArea(display, root_window, pixmap, gc, 0, 0, width, height, 0, 0)) {
+		long pixmap_as_long;
+		pixmap_as_long = (long)pixmap;
+		XChangeProperty(display, root_window, id_atom, XA_PIXMAP, 32, PropModeReplace, (unsigned char *) &pixmap_as_long, 1);
+	}
+	XFreeGC(display, gc);
+}
+
+void slave_save_root_windows(Display *display)
+{
+	int i, number_of_screens;
+	Atom atom;
+	number_of_screens = ScreenCount(display);
+	atom = XInternAtom(display, "_XROOTPMAP_ID", False);
+
+	if (atom == 0)
+		return;
+
+	for (i = 0; i < number_of_screens; i++)
+		slave_save_root_window_of_screen(display, atom, i);
+
+	XSync(display, False);
 }
 #endif
 
@@ -223,7 +266,7 @@ int main(int argc, char **argv)
 #endif
 #ifdef HAVE_PLYMOUTH
 	struct pollfd pfd;
-	int pollval;
+	int pollval, pl_is_running;
 #endif
 
 	/* Step 1: block sigusr1 until we wait for it */
@@ -305,11 +348,6 @@ int main(int argc, char **argv)
 		} while (1);
 
 #ifdef HAVE_PLYMOUTH
-		if (plymouth_is_running()) {
-			plymouth_prepare_for_transition();
-			plymouth_quit_with_transition();
-		}
-
 		/*
 		 * Poll for the arrival of the DISPLAY value,
 		 * this indicates the X server has started.
@@ -320,15 +358,33 @@ int main(int argc, char **argv)
 			pollval = poll(&pfd, 1, -1);
 		} while (pollval < 0 && errno == EINTR);
 
+		pl_is_running = plymouth_is_running();
+		if (pl_is_running)
+			plymouth_prepare_for_transition();
+
 		if (pollval >= 0) {
 			char disp[16];
 
-			if (read(pipe_fds[0], disp, sizeof(disp)) > 0)
+			if (read(pipe_fds[0], disp, sizeof(disp)) > 0) {
+				if (pl_is_running) {
+					char xdisp[24];
+					Display *display;
+
+					sprintf(xdisp, ":%s", disp);
+
+					display = XOpenDisplay(xdisp);
+					slave_save_root_windows(display);
+					XCloseDisplay(display);
+				}
+
 				sd_notifyf(0, "READY=1\nSTATUS=Xorg server started on DISPLAY=:%s\n", disp);
-			else
+			} else
 				sd_notifyf(0, "READY=1\nSTATUS=Reading failed from -displayfd with errno %d\n", errno);
 		} else
 			sd_notifyf(0, "READY=1\nSTATUS=Polling failed on -displayfd with errno %d\n", errno);
+
+		if (pl_is_running)
+			plymouth_quit_with_transition();
 #endif
 
 		/* handle TERM gracefully and pass it on to xpid */
