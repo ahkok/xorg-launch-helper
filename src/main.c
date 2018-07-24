@@ -112,9 +112,9 @@ static void xdg_vtnr_current_vt(pam_handle_t *pamh)
 	close (fd);
 	fd = -1;
 
-	snprintf(vt_string, sizeof(vt_string), "vt%d", vt_state.v_active);
+	snprintf(vt_string, sizeof(vt_string), "%d", vt_state.v_active);
 	setenv("XDG_VTNR", vt_string, 1);
-	snprintf(vt_string, sizeof(vt_string), "XDG_VTNR=vt%d", vt_state.v_active);
+	snprintf(vt_string, sizeof(vt_string), "XDG_VTNR=%d", vt_state.v_active);
 	pam_putenv(pamh, vt_string);
 	snprintf(vt_string, sizeof(vt_string), "/dev/tty%d", vt_state.v_active);
 	pam_set_item(pamh, PAM_TTY, vt_string);
@@ -157,6 +157,11 @@ static int start_xserver(int argc, char **argv)
 			sprintf(vtnr, "vt%d", vt);
 			ptrs[++count] = vtnr;
 		}
+	}
+
+	if (getenv("XDG_SEAT") != NULL) {
+		ptrs[++count] = "-seat";
+		ptrs[++count] = getenv("XDG_SEAT");
 	}
 
 	if (pipe_fds[0] >= 0) {
@@ -356,6 +361,7 @@ int main(int argc, char **argv)
 	pw = getpwuid(myuid);
 	pamval = pam_start(XORG_PAM_APPNAME, pw->pw_name, &conv, &pamh);
 	if (pamval == PAM_SUCCESS) {
+		setenv("XDG_SEAT", "seat0", 1);
 		pam_putenv(pamh, "XDG_SEAT=seat0");
 		pam_putenv(pamh, "XDG_SESSION_CLASS=greeter");
 		xdg_vtnr_current_vt(pamh);
