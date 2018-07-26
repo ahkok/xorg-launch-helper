@@ -14,7 +14,7 @@
 [Unit]
 Description=Xorg server launch helper
 Before=xorg.target
-After=getty@tty1.service rc-local.service plymouth-start.service systemd-user-sessions.service plymouth-quit.service livesys-late.service
+After=getty@tty1.service rc-local.service plymouth-start.service systemd-user-sessions.service livesys-late.service
 Conflicts=getty@tty1.service plymouth-quit.service
 OnFailure=plymouth-quit.service
 
