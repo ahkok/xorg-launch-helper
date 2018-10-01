@@ -53,11 +53,9 @@ static int pipe_fds[2];
 /* Set this to 0 to deduce ourselves the next available VTn */
 #define INITIAL_VT	1
 
-static void termhandler(int foo)
+static void termhandler(int signum)
 {
-	if (foo++) foo--;
-
-	kill(xpid, SIGTERM);
+	kill(xpid, signum);
 }
 
 #ifdef HAVE_PLYMOUTH
@@ -300,7 +298,7 @@ int main(int argc, char **argv)
 	if (pid) {
 		struct timespec starttime;
 		struct timespec timeout;
-		int status;
+		int status, exitcode;
 		int retries = 3;
 
 		xpid = pid;
@@ -409,12 +407,14 @@ int main(int argc, char **argv)
 		/* handle TERM gracefully and pass it on to xpid */
 		memset(&term, 0, sizeof(struct sigaction));
 		term.sa_handler = termhandler;
+		sigaction(SIGINT, &term, NULL);
 		sigaction(SIGTERM, &term, NULL);
 
 		/* sit and wait for Xorg to exit */
 		pid = waitpid(xpid, &status, 0);
-		sd_notify(0, "STOPPING=1\n");
-		return (WIFEXITED(status) ? WEXITSTATUS(status) : EXIT_FAILURE);
+		exitcode = (WIFEXITED(status) ? WEXITSTATUS(status) : EXIT_FAILURE);
+		sd_notifyf(0, "STOPPING=1\nSTATUS=Xorg exited with %d\n", exitcode);
+		return exitcode;
 	}
 
 	/* if we get here we're the child */
