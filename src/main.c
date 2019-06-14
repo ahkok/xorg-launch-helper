@@ -411,10 +411,12 @@ int main(int argc, char **argv)
 		sigaction(SIGTERM, &term, NULL);
 
 		/* sit and wait for Xorg to exit */
-		pid = waitpid(xpid, &status, 0);
+		do {
+			pid = waitpid(xpid, &status, 0);
+		} while (pid != (pid_t)-1);
 		exitcode = (WIFEXITED(status) ? WEXITSTATUS(status) : EXIT_FAILURE);
 		sd_notifyf(0, "STOPPING=1\nSTATUS=Xorg exited with %d\n", exitcode);
-		return exitcode;
+		return 0;
 	}
 
 	/* if we get here we're the child */
