@@ -45,7 +45,7 @@
 #include <security/pam_misc.h>
 #endif
 
-static int xpid;
+static pid_t xpid;
 #ifdef HAVE_PLYMOUTH
 static int pipe_fds[2];
 #endif
