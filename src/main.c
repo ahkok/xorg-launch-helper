@@ -25,6 +25,7 @@
 #include <string.h>
 #include <signal.h>
 #include <string.h>
+#include <syslog.h>
 #include <time.h>
 #include <assert.h>
 #include <linux/limits.h>
@@ -300,6 +301,7 @@ int main(int argc, char **argv)
 		struct timespec timeout;
 		int status, exitcode;
 		int retries = 3;
+		int saved_errno;
 
 		xpid = pid;
 
@@ -412,8 +414,12 @@ int main(int argc, char **argv)
 
 		/* sit and wait for Xorg to exit */
 		do {
+			syslog(LOG_USER | LOG_NOTICE, "waiting for Xorg to exit...");
+			errno = 0;
 			pid = waitpid(xpid, &status, 0);
-		} while (pid != (pid_t)-1);
+			saved_errno = errno;
+			syslog(LOG_USER | LOG_NOTICE, "waiting for Xorg to exit terminated with waitpid return value %d (errno %d)", pid, saved_errno);
+		} while (pid == (pid_t)-1 && saved_errno == EINTR);
 		exitcode = (WIFEXITED(status) ? WEXITSTATUS(status) : EXIT_FAILURE);
 		sd_notifyf(0, "STOPPING=1\nSTATUS=Xorg exited with %d\n", exitcode);
 		return 0;
