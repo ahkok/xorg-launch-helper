@@ -62,7 +62,7 @@ static void termhandler(int signum)
 #ifdef HAVE_PLYMOUTH
 static int plymouth_is_running(void)
 {
-	FILE *fp = popen("/bin/plymouth --ping", "r");
+	FILE *fp = popen("plymouth --ping", "r");
 	int	 status;
 
 	if (!fp) {
@@ -77,7 +77,7 @@ static int plymouth_is_running(void)
 
 static void plymouth_prepare_for_transition(void)
 {
-	FILE *fp = popen("/bin/plymouth deactivate", "r");
+	FILE *fp = popen("plymouth deactivate", "r");
 
 	if (!fp) {
 		fprintf(stderr, "Could not deactivate plymouth\n");
@@ -89,7 +89,7 @@ static void plymouth_prepare_for_transition(void)
 
 static void plymouth_quit_with_transition(void)
 {
-	FILE *fp = popen("/bin/plymouth quit --retain-splash", "r");
+	FILE *fp = popen("plymouth quit --retain-splash", "r");
 
 	if (!fp) {
 		fprintf(stderr, "Could not deactivate plymouth\n");
