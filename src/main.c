@@ -209,10 +209,8 @@ static int start_xserver(int argc, char **argv)
 	ptrs[count] = xserver;
 
 #ifdef HAVE_PLYMOUTH
-	if (pl_is_running) {
+	if (pl_is_running)
 		plymouth_prepare_for_transition();
-		plymouth_quit_with_transition();
-	}
 
 	if (getenv("XDG_VTNR") != NULL) {
 		int vt;
@@ -403,6 +401,9 @@ int main(int argc, char **argv)
 				sd_notifyf(0, "READY=1\nSTATUS=Reading failed from -displayfd with errno %d\n", errno);
 		} else
 			sd_notifyf(0, "READY=1\nSTATUS=Polling failed on -displayfd with errno %d\n", errno);
+
+		if (pl_is_running)
+			plymouth_quit_with_transition();
 #endif
 
 		/* handle TERM gracefully and pass it on to xpid */
