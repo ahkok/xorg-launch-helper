@@ -190,6 +190,7 @@ static int start_xserver(int argc, char **argv)
 #ifdef HAVE_PLYMOUTH
 	char vtnr[16];
 	char dispn[16];
+	int vt;
 #endif
 
 	if (!xserver) {
@@ -213,19 +214,22 @@ static int start_xserver(int argc, char **argv)
 		plymouth_prepare_for_transition();
 
 	if (getenv("XDG_VTNR") != NULL) {
-		int vt;
 
 		vt = atoi(getenv("XDG_VTNR"));
 
 		if (vt > 0 && vt < 64) {
 
-			sprintf(vtnr, "vt%d", vt);
-			ptrs[++count] = vtnr;
 			fprintf(stderr, "Using XDG_VTNR=%d / vt%d!\n", vt, vt);
-		} else
-			fprintf(stderr, "XDG_VTNR is invalid!\n");
-	} else
-		fprintf(stderr, "XDG_VTNR is unset!\n");
+		} else {
+			fprintf(stderr, "XDG_VTNR is invalid, using vt1!\n");
+			vt = 1;
+		}
+	} else {
+		fprintf(stderr, "XDG_VTNR is unset, using vt1!\n");
+		vt = 1;
+	}
+	sprintf(vtnr, "vt%d", vt);
+	ptrs[++count] = vtnr;
 
 	if (getenv("XDG_SEAT") != NULL) {
 		ptrs[++count] = "-seat";
@@ -240,7 +244,7 @@ static int start_xserver(int argc, char **argv)
 	ptrs[++count] = "-background";
 	ptrs[++count] = "none";
 	ptrs[++count] = "-noreset";
-	ptrs[++count] = "-keeptty";
+	ptrs[++count] = "-novtswitch";
 #endif
 
 	for (i = 1; i < argc; i++)
