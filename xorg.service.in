@@ -14,10 +14,15 @@
 [Unit]
 Description=Xorg server launch helper
 Before=xorg.target
+After=getty@tty1.service rc-local.service plymouth-start.service systemd-user-sessions.service livesys-late.service
+Conflicts=getty@tty1.service plymouth-quit.service
+OnFailure=plymouth-quit.service
 
 [Service]
 Type=notify
-ExecStart=@prefix@/bin/xorg-launch-helper :0 -nolisten tcp -noreset vt1
+ExecStart=@bindir@/xorg-launch-helper
 Restart=always
 RestartSec=10
 
+[Install]
+WantedBy=xorg.target
